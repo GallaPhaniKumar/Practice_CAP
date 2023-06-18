@@ -1,40 +1,152 @@
-_schema-version: '3.1'
+_schema-version: "3.1"
 ID: MyHANAApp
+description: A simple CAP project.
 version: 1.0.0
-description: "A simple CAP project."
+modules:
+- name: MyHANAApp-srv
+  type: nodejs
+  path: gen/srv
+  requires:
+  - name: MyHANAApp-db
+  - name: uaa_MyHANAApp
+  provides:
+  - name: srv-api
+    properties:
+      srv-url: ${default-url}
+  parameters:
+    buildpack: nodejs_buildpack
+    host: ${appname}
+  build-parameters:
+    builder: npm-ci
+    ignore:
+    - .env
+    - ./node_modules
+- name: MyHANAApp-db-deployer
+  type: hdb
+  path: db
+  requires:
+  - name: MyHANAApp-db
+    properties:
+      TARGET_CONTAINER: ~{hdi-container-name}
+  - name: cross-container-service-1
+    group: SERVICE_REPLACEMENTS
+    properties:
+      key: ServiceName_1
+      service: ~{the-service-name}
+  parameters:
+    buildpack: nodejs_buildpack
+- name: MyHANAApp-destination-content
+  type: com.sap.application.content
+  requires:
+  - name: MyHANAApp-destination-service
+    parameters:
+      content-target: true
+  - name: MyHANAApp_html_repo_host
+    parameters:
+      service-key:
+        name: MyHANAApp_html_repo_host-key
+  - name: uaa_MyHANAApp
+    parameters:
+      service-key:
+        name: uaa_MyHANAApp-key
+  parameters:
+    content:
+      instance:
+        destinations:
+        - Name: hana_app_MyHANAApp_html_repo_host
+          ServiceInstanceName: MyHANAApp-html5-app-host-service
+          ServiceKeyName: MyHANAApp_html_repo_host-key
+          sap.cloud.service: hana.app
+        - Authentication: OAuth2UserTokenExchange
+          Name: hana_app_uaa_MyHANAApp
+          ServiceInstanceName: MyHANAApp-xsuaa-service
+          ServiceKeyName: uaa_MyHANAApp-key
+          sap.cloud.service: hana.app
+        existing_destinations_policy: ignore
+  build-parameters:
+    no-source: true
+- name: MyHANAApp-app-content
+  type: com.sap.application.content
+  path: .
+  requires:
+  - name: MyHANAApp_html_repo_host
+    parameters:
+      content-target: true
+  build-parameters:
+    build-result: resources
+    requires:
+    - artifacts:
+      - frontend.zip
+      name: frontend
+      target-path: resources/
+- name: frontend
+  type: html5
+  path: app/frontend
+  build-parameters:
+    build-result: dist
+    builder: custom
+    commands:
+    - npm install
+    - npm run build:cf
+    supported-platforms: []
+resources:
+- name: MyHANAApp-db
+  type: com.sap.xs.hdi-container
+  parameters:
+    service: hana
+    service-plan: hdi-shared
+  properties:
+    hdi-container-name: ${service-name}
+- name: MyHANAApp-destination-service
+  type: org.cloudfoundry.managed-service
+  parameters:
+    config:
+      HTML5Runtime_enabled: true
+      init_data:
+        instance:
+          destinations:
+          - Authentication: NoAuthentication
+            Name: ui5
+            ProxyType: Internet
+            Type: HTTP
+            URL: https://ui5.sap.com
+          - Authentication: NoAuthentication
+            HTML5.DynamicDestination: true
+            HTML5.ForwardAuthToken: true
+            Name: hana-app-api
+            ProxyType: Internet
+            URL: https://${appname}.${default-domain}
+            type: HTTP
+          existing_destinations_policy: update
+      version: 1.0.0
+    service: destination
+    service-name: MyHANAApp-destination-service
+    service-plan: lite
+- name: MyHANAApp_html_repo_host
+  type: org.cloudfoundry.managed-service
+  parameters:
+    service: html5-apps-repo
+    service-name: MyHANAApp-html5-app-host-service
+    service-plan: app-host
+- name: uaa_MyHANAApp
+  type: org.cloudfoundry.managed-service
+  parameters:
+    path: ./xs-security.json
+    service: xsuaa
+    service-name: MyHANAApp-xsuaa-service
+    service-plan: application
+- name: cross-container-service-1
+  type: org.cloudfoundry.existing-service
+  parameters:
+    service-name: MyHANAApp-db
+  properties:
+    the-service-name: ${service-name}
 parameters:
+  appname: unique-0b703415
+  deploy_mode: html5-repo
   enable-parallel-deployments: true
 build-parameters:
   before-all:
-    - builder: custom
-      commands:
-        - npx -p @sap/cds-dk cds build --production
-modules:
-  - name: MyHANAApp-srv
-    type: nodejs
-    path: gen/srv
-    parameters:
-      buildpack: nodejs_buildpack
-    build-parameters:
-      builder: npm-ci
-    provides:
-      - name: srv-api # required by consumers of CAP services (e.g. approuter)
-        properties:
-          srv-url: ${default-url}
-    requires:
-      - name: MyHANAApp-db
-
-  - name: MyHANAApp-db-deployer
-    type: hdb
-    path: db #gen/db
-    parameters:
-      buildpack: nodejs_buildpack
-    requires:
-      - name: MyHANAApp-db
-
-resources:
-  - name: MyHANAApp-db
-    type: com.sap.xs.hdi-container
-    parameters:
-      service: hana
-      service-plan: hdi-shared
+  - builder: custom
+    commands:
+    - npx -p @sap/cds-dk cds build --production
