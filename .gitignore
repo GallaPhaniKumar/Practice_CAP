@@ -39,3 +39,5 @@ app/frontend/.env
 
 dist/
 resources/
+# auto generated wildcard
+srv/.env
