@@ -1,20 +1,26 @@
 {
   "xsappname": "myhanaapp",
   "tenant-mode": "dedicated",
-  "description": "Security profile of called application",
   "scopes": [
     {
-      "name": "uaa.user",
-      "description": "UAA"
+      "name": "$XSAPPNAME.Admin",
+      "description": "Admin"
     }
   ],
+  "attributes": [],
   "role-templates": [
     {
-      "name": "Token_Exchange",
-      "description": "UAA",
+      "name": "Admin",
+      "description": "generated",
       "scope-references": [
-        "uaa.user"
-      ]
+        "$XSAPPNAME.Admin"
+      ],
+      "attribute-references": []
     }
-  ]
+  ],
+  "oauth2-configuration": {
+    "redirect-uris": [
+      "https://*.applicationstudio.cloud.sap/**"
+    ]
+  }
 }
